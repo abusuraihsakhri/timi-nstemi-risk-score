@@ -13,8 +13,8 @@ from enrichment import (
     FilesToCreatemodifyEngine,
     AcceptanceCriteriaEngine,
     CoronaryCalciumScoreCacIntegrationEngine,
-    ClinicalRationaleEngine,
-    ImplementationPlanEngine,
+    ClinicalRationaleCACEngine,
+    ImplementationPlanCACEngine,
     TiminstemiriskscoreEnrichmentSuite,
     enrichment_suite,
 )

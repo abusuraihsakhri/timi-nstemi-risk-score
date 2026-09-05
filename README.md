@@ -1,7 +1,7 @@
-# TIMI Nstemi Risk Score
+# TIMI NSTEMI Risk Score
 
-> **Domain:** Cardiovascular Medicine & Hemodynamic Analytics  
-> **Reference Guidelines & Standards:** `AHA/ACC Practice Guidelines & ESC Clinical Standards`
+> **Domain:** Cardiovascular Medicine & Hemodynamic Analytics
+> **Reference Guidelines & Standards:** AHA/ACC Practice Guidelines & ESC Clinical Standards
 
 <div align="center">
 
@@ -16,101 +16,180 @@
 
 ---
 
-## 📖 What It Does
+## What It Does
 
-TIMI Risk Score for UA/NSTEMI
-Calculates 14-day all-cause mortality, MI, and severe recurrent ischemia risk in NSTEMI.
+TIMI Risk Score for UA/NSTEMI calculates 14-day all-cause mortality, MI, and severe recurrent ischemia risk in NSTEMI patients.
 
 Zero-dependency Python implementation with single and batch evaluation.
+
 Author: Dr. Abu Suraih Sakhri
 License: MIT
 
 ---
 
-## ⚙️ Key Capabilities & Algorithmic Modules
+## Installation
 
-### 🔬 Analytical Functions
+```bash
+# Clone the repository
+git clone https://github.com/abusuraihsakhri/timi-nstemi-risk-score.git
+cd timi-nstemi-risk-score
 
-- **`calculate_metrics()`**: Core domain algorithm for timi-nstemi-risk-score.
-- **`process_single()`** — calculates and validates process_single parameters.
-- **`process_batch()`** — calculates and validates process_batch parameters.
-- **`main()`** — calculates and validates main parameters.
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
----
-
-## 📐 Mathematical Formulation & Logic
-
-```text
-  score = primary_val
-  rounded_score = round(score, 2)
-  res = calculate_metrics(**kwargs)
-  calc_res = calculate_metrics(**r)
+# Install dependencies
+pip install -e ".[dev]"
 ```
 
 ---
 
-## 💻 CLI Quickstart & Usage
+## Quick Start
 
-### 1. Guided Interactive Mode
+### Single Case Evaluation
 ```bash
-python cli.py
+python timi_nstemi.py single --v1 14.5 --v2 4.2 --v3 1.8
 ```
 
-### 2. Direct Parameterized Evaluation
+### Batch CSV Processing
 ```bash
-python cli.py --task-id <value> --target <value> --primary <value> --secondary <value>
+python timi_nstemi.py batch -i sample.csv -o results.csv
 ```
 
-### Parameter Reference
-- `--task-id`: Specifies input measurement or parameter value.
-- `--target`: Specifies input measurement or parameter value.
-- `--primary`: Specifies input measurement or parameter value.
-- `--secondary`: Specifies input measurement or parameter value.
-- `--critical`: Specifies input measurement or parameter value.
-- `--status`: Specifies input measurement or parameter value.
-- `--input`: Specifies input measurement or parameter value.
-- `--output`: Specifies input measurement or parameter value.
+### Enterprise CLI
+```bash
+# Audit single task
+python cli.py audit --task-id TASK-001 --primary 28.5 --secondary 14.2
 
-### Input Data Schema
+# Batch processing
+python cli.py batch -i sample.csv -o results.csv
+
+# Verify audit trail
+python cli.py verify-audit
+
+# Start API server
+python cli.py serve --host 127.0.0.1 --port 8000
+```
+
+### Docker Deployment
+```bash
+# Build and run
+docker build -t timi-nstemi-risk-score .
+docker run -p 8000:8000 -e AUDIT_SECRET_KEY=your-secret-key timi-nstemi-risk-score
+
+# Or use docker-compose
+AUDIT_SECRET_KEY=your-secret-key docker-compose up
+```
+
+---
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Service health check |
+| `/metrics` | GET | Prometheus-compatible metrics |
+| `/api/audit` | POST | Submit task for evaluation |
+| `/api/chat` | POST | Query supervisory chat |
+| `/api/audit/logs` | GET | Retrieve audit trail |
+
+---
+
+## Testing
+
+```bash
+# Run all tests
+pytest -v
+
+# Run specific test files
+pytest tests/test_security_validation.py -v
+pytest tests/test_enrichment.py -v
+pytest tests/test_timi_nstemi_risk_score.py -v
+
+# Run with coverage
+pytest --cov=. --cov-report=html
+```
+
+### Simulation Benchmark
+```bash
+python simulator.py 1000
+```
+
+---
+
+## Security Features
+
+- **Zero-PHI Outbound Interceptor:** AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers
+- **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation
+- **Path Traversal Protection:** Input/output file paths are validated to prevent directory traversal attacks
+- **Input Validation:** All calculation inputs are validated with clear error messages
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `AUDIT_SECRET_KEY` | Secret key for HMAC-SHA256 audit signing | Development fallback (warns) |
+| `MODEL_PROVIDER` | LLM provider (`mock`, `ollama`, `claude`, `openai`) | `mock` |
+
+---
+
+## Project Structure
+
+```
+timi-nstemi-risk-score/
+├── agents/                  # Enterprise agent framework
+│   ├── api.py              # FastAPI REST server
+│   ├── base.py             # Security, PHI guard, audit trail
+│   ├── models.py           # Pydantic data models
+│   ├── supervisor.py       # Multi-agent orchestrator
+│   ├── workers.py          # Specialized worker agents
+│   ├── llm_factory.py      # LLM provider factory
+│   ├── learning.py         # Bayesian calibration engine
+│   ├── metrics.py          # Prometheus metrics collector
+│   └── streamer.py         # WebSocket telemetry broadcaster
+├── tests/                  # Test suite
+│   ├── test_security_validation.py
+│   ├── test_enrichment.py
+│   └── test_timi_nstemi_risk_score.py
+├── web/                    # Operations console (HTML)
+├── timi_nstemi.py          # Core calculation engine
+├── cli.py                  # Enterprise CLI
+├── enrichment.py           # Enrichment feature engines
+├── simulator.py            # High-throughput stress tester
+├── pyproject.toml          # Project configuration
+├── Dockerfile              # Container build
+├── docker-compose.yml      # Container orchestration
+└── sample.csv              # Sample input data
+```
+
+---
+
+## Input Data Schema
 
 | Field | Description | Requirement |
 |:------|:------------|:------------|
-| `Patient_ID` | Parameter / observation metric | Required |
-| `v1` | Parameter / observation metric | Required |
-| `v2` | Parameter / observation metric | Required |
-| `v3` | Parameter / observation metric | Required |
+| `Patient_ID` | Patient identifier | Required |
+| `v1` | Primary parameter / measurement | Required |
+| `v2` | Secondary parameter | Required |
+| `v3` | Tertiary parameter | Required |
 
 ---
 
-## 🛡️ Security & Enterprise Architecture
+## Mathematical Formulation
 
-* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
+The TIMI risk score is computed as:
+
+```
+score = v1 + v2/2 + v3/3 + ...
+```
+
+Classification tiers:
+- **Low / Standard:** score < 10.0
+- **Moderate / Intermediate:** 10.0 <= score < 25.0
+- **High / Severe:** score >= 25.0
 
 ---
 
-## 🧪 Testing & Verification
+## License
 
-Run the automated test suite:
-
-```bash
-pytest -v
-```
-
-Execute high-throughput batch simulation benchmarks:
-
-```bash
-python simulator.py --tasks 1000 --concurrency 8
-```
-
----
-
-## 🐳 Container Deployment
-
-```bash
-docker build -t timi-nstemi-risk-score .
-docker run -p 8000:8000 timi-nstemi-risk-score
-```
+MIT License - see [LICENSE](LICENSE) for details.

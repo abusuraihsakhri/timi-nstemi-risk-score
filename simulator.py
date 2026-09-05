@@ -1,6 +1,7 @@
 """
 Distributed Component High-Throughput Traffic & Stress Testing Simulator for Timi Nstemi Risk Score.
 """
+import os
 import time
 import random
 import sys
@@ -10,7 +11,8 @@ from agents.base import PHIGuard, SecurityException, AuditLogger
 
 def run_simulation(iterations: int = 100):
     print(f"Starting Distributed Component Simulation on Timi Nstemi Risk Score ({iterations} tasks)...")
-    supervisor = SystemSupervisor(model_provider="mock")
+    provider = os.getenv("MODEL_PROVIDER", "mock")
+    supervisor = SystemSupervisor(model_provider=provider)
     start_time = time.time()
     nominal_count = 0
     elevated_count = 0

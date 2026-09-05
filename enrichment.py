@@ -309,11 +309,11 @@ class CoronaryCalciumScoreCacIntegrationEngine:
         return res
 
 # =============================================================================
-# 7. CLINICAL RATIONALE
+# 7. CLINICAL RATIONALE (CAC Context)
 # =============================================================================
 @dataclass
-class ClinicalRationaleEngineResult:
-    feature_name: str = "Clinical Rationale"
+class ClinicalRationaleCACEngineResult:
+    feature_name: str = "Clinical Rationale (CAC Context)"
     status: str = "OPTIMAL"
     score: float = 0.0
     metrics: Dict[str, Any] = field(default_factory=dict)
@@ -321,16 +321,16 @@ class ClinicalRationaleEngineResult:
     recommendations: List[str] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
 
-class ClinicalRationaleEngine:
+class ClinicalRationaleCACEngine:
     """
     Clinical Rationale: CAC scoring via non-contrast CT provides independent cardiovascular risk prediction. CAC=0 reclassifies many patients to
     """
     def __init__(self, threshold: float = 1.0, config: Optional[Dict[str, Any]] = None):
         self.threshold = threshold
         self.config = config or {}
-        self.history: List[ClinicalRationaleEngineResult] = []
+        self.history: List[ClinicalRationaleCACEngineResult] = []
 
-    def evaluate(self, primary_value: float, secondary_value: float = 0.0, **kwargs) -> ClinicalRationaleEngineResult:
+    def evaluate(self, primary_value: float, secondary_value: float = 0.0, **kwargs) -> ClinicalRationaleCACEngineResult:
         alerts = []
         recs = []
         status = "OPTIMAL"
@@ -338,17 +338,17 @@ class ClinicalRationaleEngine:
 
         if primary_value > self.threshold * 2:
             status = "CRITICAL_ALERT"
-            alerts.append(f"Clinical Rationale: Primary value {primary_value:.2f} breached critical threshold ({self.threshold * 2:.2f})")
+            alerts.append(f"Clinical Rationale (CAC Context): Primary value {primary_value:.2f} breached critical threshold ({self.threshold * 2:.2f})")
             recs.append("Initiate immediate protocol review and escalate to attending lead.")
         elif primary_value > self.threshold:
             status = "WARNING"
-            alerts.append(f"Clinical Rationale: Value {primary_value:.2f} exceeds baseline threshold ({self.threshold:.2f})")
+            alerts.append(f"Clinical Rationale (CAC Context): Value {primary_value:.2f} exceeds baseline threshold ({self.threshold:.2f})")
             recs.append("Increase monitoring frequency and perform secondary verification.")
         else:
             recs.append("Parameters nominal under standard operating bounds.")
 
-        res = ClinicalRationaleEngineResult(
-            feature_name="Clinical Rationale",
+        res = ClinicalRationaleCACEngineResult(
+            feature_name="Clinical Rationale (CAC Context)",
             status=status,
             score=score,
             metrics={"primary": primary_value, "secondary": secondary_value, **kwargs},
@@ -359,11 +359,11 @@ class ClinicalRationaleEngine:
         return res
 
 # =============================================================================
-# 8. IMPLEMENTATION PLAN
+# 8. IMPLEMENTATION PLAN (CAC Context)
 # =============================================================================
 @dataclass
-class ImplementationPlanEngineResult:
-    feature_name: str = "Implementation Plan"
+class ImplementationPlanCACEngineResult:
+    feature_name: str = "Implementation Plan (CAC Context)"
     status: str = "OPTIMAL"
     score: float = 0.0
     metrics: Dict[str, Any] = field(default_factory=dict)
@@ -371,16 +371,16 @@ class ImplementationPlanEngineResult:
     recommendations: List[str] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
 
-class ImplementationPlanEngine:
+class ImplementationPlanCACEngine:
     """
     Implementation Plan: - **Data Model**: Add `CACResult` dataclass: `cac_score`, `percentile_rank`, `age_sex_group`
     """
     def __init__(self, threshold: float = 1.0, config: Optional[Dict[str, Any]] = None):
         self.threshold = threshold
         self.config = config or {}
-        self.history: List[ImplementationPlanEngineResult] = []
+        self.history: List[ImplementationPlanCACEngineResult] = []
 
-    def evaluate(self, primary_value: float, secondary_value: float = 0.0, **kwargs) -> ImplementationPlanEngineResult:
+    def evaluate(self, primary_value: float, secondary_value: float = 0.0, **kwargs) -> ImplementationPlanCACEngineResult:
         alerts = []
         recs = []
         status = "OPTIMAL"
@@ -388,17 +388,17 @@ class ImplementationPlanEngine:
 
         if primary_value > self.threshold * 2:
             status = "CRITICAL_ALERT"
-            alerts.append(f"Implementation Plan: Primary value {primary_value:.2f} breached critical threshold ({self.threshold * 2:.2f})")
+            alerts.append(f"Implementation Plan (CAC Context): Primary value {primary_value:.2f} breached critical threshold ({self.threshold * 2:.2f})")
             recs.append("Initiate immediate protocol review and escalate to attending lead.")
         elif primary_value > self.threshold:
             status = "WARNING"
-            alerts.append(f"Implementation Plan: Value {primary_value:.2f} exceeds baseline threshold ({self.threshold:.2f})")
+            alerts.append(f"Implementation Plan (CAC Context): Value {primary_value:.2f} exceeds baseline threshold ({self.threshold:.2f})")
             recs.append("Increase monitoring frequency and perform secondary verification.")
         else:
             recs.append("Parameters nominal under standard operating bounds.")
 
-        res = ImplementationPlanEngineResult(
-            feature_name="Implementation Plan",
+        res = ImplementationPlanCACEngineResult(
+            feature_name="Implementation Plan (CAC Context)",
             status=status,
             score=score,
             metrics={"primary": primary_value, "secondary": secondary_value, **kwargs},
@@ -420,8 +420,8 @@ class TiminstemiriskscoreEnrichmentSuite:
         self.filestocreatemodifye = FilesToCreatemodifyEngine()
         self.acceptancecriteriaen = AcceptanceCriteriaEngine()
         self.coronarycalciumscore = CoronaryCalciumScoreCacIntegrationEngine()
-        self.clinicalrationaleeng = ClinicalRationaleEngine()
-        self.implementationplanen = ImplementationPlanEngine()
+        self.clinicalrationalecaceng = ClinicalRationaleCACEngine()
+        self.implementationplancaceng = ImplementationPlanCACEngine()
 
     def execute_all(self, primary_val: float = 1.5, secondary_val: float = 0.5) -> Dict[str, Any]:
         results = {}
@@ -431,8 +431,8 @@ class TiminstemiriskscoreEnrichmentSuite:
         results["FilesToCreatemodifyEngine"] = self.filestocreatemodifye.evaluate(primary_val, secondary_val)
         results["AcceptanceCriteriaEngine"] = self.acceptancecriteriaen.evaluate(primary_val, secondary_val)
         results["CoronaryCalciumScoreCacIntegrationEngine"] = self.coronarycalciumscore.evaluate(primary_val, secondary_val)
-        results["ClinicalRationaleEngine"] = self.clinicalrationaleeng.evaluate(primary_val, secondary_val)
-        results["ImplementationPlanEngine"] = self.implementationplanen.evaluate(primary_val, secondary_val)
+        results["ClinicalRationaleCACEngine"] = self.clinicalrationalecaceng.evaluate(primary_val, secondary_val)
+        results["ImplementationPlanCACEngine"] = self.implementationplancaceng.evaluate(primary_val, secondary_val)
         return results
 
 # Global instance

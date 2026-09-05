@@ -12,7 +12,9 @@ import argparse
 import csv
 import json
 import math
+import os
 import sys
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 
@@ -27,6 +29,9 @@ def calculate_metrics(**kwargs) -> Dict[str, Any]:
                 params[k] = float(v)
             except (ValueError, TypeError):
                 params[k] = str(v)
+
+    if not params:
+        raise ValueError("At least one input parameter is required")
 
     # Deterministic domain logic
     numeric_vals = [val for val in params.values() if isinstance(val, (int, float))]
@@ -65,8 +70,31 @@ def process_single(args) -> None:
     print(json.dumps(res, indent=2))
 
 
+def _validate_safe_path(path_str: str, must_exist: bool = False) -> Path:
+    """Validate that a path is safe (no traversal) and return resolved Path.
+
+    Blocks path traversal via '..' components while allowing legitimate absolute
+    and relative paths including temp directories used by test frameworks.
+    """
+    if not path_str:
+        raise ValueError("Empty path provided")
+
+    # Reject paths that attempt traversal via .. components
+    normalized = os.path.normpath(path_str)
+    if ".." in Path(normalized).parts:
+        raise ValueError(f"Path traversal detected: '{path_str}' contains '..' components")
+
+    path = Path(path_str).resolve()
+    if must_exist and not path.exists():
+        raise FileNotFoundError(f"Input file not found: {path_str}")
+    return path
+
+
 def process_batch(input_csv: str, output_csv: str) -> None:
-    with open(input_csv, mode="r", encoding="utf-8-sig") as f:
+    in_path = _validate_safe_path(input_csv, must_exist=True)
+    out_path = _validate_safe_path(output_csv, must_exist=False)
+
+    with open(in_path, mode="r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         fieldnames = list(reader.fieldnames or [])
         rows = list(reader)
@@ -82,12 +110,12 @@ def process_batch(input_csv: str, output_csv: str) -> None:
         row_dict["clinical_recommendation"] = calc_res["clinical_recommendation"]
         out_rows.append(row_dict)
 
-    with open(output_csv, mode="w", encoding="utf-8", newline="") as f:
+    with open(out_path, mode="w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=out_fields)
         writer.writeheader()
         writer.writerows(out_rows)
 
-    print(f"Processed {len(out_rows)} records -> {output_csv}")
+    print(f"Processed {len(out_rows)} records -> {out_path}")
 
 
 def main(argv=None):
