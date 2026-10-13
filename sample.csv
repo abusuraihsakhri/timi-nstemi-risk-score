@@ -1,4 +1,4 @@
-Patient_ID,v1,v2,v3
-PT-101,14.5,4.2,1.8
-PT-102,8.0,2.1,0.5
-PT-103,28.4,12.0,5.5
+case_id,age,cad_risk_factors,known_cad,aspirin_last_7_days,anginal_events_24h,st_deviation,elevated_biomarkers
+EXAMPLE-001,65,3,yes,no,2,no,yes
+EXAMPLE-002,45,1,no,no,0,no,no
+EXAMPLE-003,75,4,yes,yes,3,yes,yes
