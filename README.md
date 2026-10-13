@@ -1,195 +1,87 @@
-# TIMI NSTEMI Risk Score
+# TIMI UA/NSTEMI Risk Score
 
-> **Domain:** Cardiovascular Medicine & Hemodynamic Analytics
-> **Reference Guidelines & Standards:** AHA/ACC Practice Guidelines & ESC Clinical Standards
+A validated implementation of the **published seven-item scoring rule** for unstable angina / non-ST-elevation myocardial infarction (UA/NSTEMI). Runs in a browser without a backend, through the Python CLI, or via a separately hosted API.
 
-<div align="center">
+**Clinical limitations:** Results are the integer 0–7 score and observed **14-day composite event rates in the original TIMI 11B cohort**. These are not individualized risk probabilities or treatment recommendations. This implementation has not been independently validated as a medical device.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+## Calculation
 
-</div>
+One point is assigned for each criterion: age ≥65 years; at least three CAD risk factors (family history, hypertension, hypercholesterolemia, diabetes, current smoking); prior coronary stenosis ≥50%; aspirin use within seven days; two or more anginal episodes within 24 hours; ST-segment deviation ≥0.5 mm; and elevated serum cardiac biomarkers.
 
----
+| TIMI score | 14-day composite event rate |
+|---|---:|
+| 0–1 | 4.7% |
+| 2 | 8.3% |
+| 3 | 13.2% |
+| 4 | 19.9% |
+| 5 | 26.2% |
+| 6–7 | 40.9% |
 
-## What It Does
+Endpoint: all-cause death, new/recurrent MI, or severe recurrent ischemia requiring urgent revascularization through 14 days. The descriptive bands (Lower 0–2, Intermediate 3–4, Higher 5–7) **are not treatment thresholds**. Source: Antman EM et al. *JAMA*. 2000;284:835–842. [doi:10.1001/jama.284.7.835](https://doi.org/10.1001/jama.284.7.835). See also the [TIMI Study Group calculator](https://timi.org/calculators/timi-risk-score-calculator-for-ua-nstemi/).
 
-TIMI Risk Score for UA/NSTEMI calculates 14-day all-cause mortality, MI, and severe recurrent ischemia risk in NSTEMI patients.
+## Browser application
 
-Zero-dependency Python implementation with single and batch evaluation.
+Open [web/index.html](web/index.html) locally, or use the GitHub Pages deployment when available. The browser app performs all scoring and CSV processing locally with no servers, analytics, outbound requests, external scripts, or persisted inputs. Do not import patient-identifiable data.
 
-Author: Dr. Abu Suraih Sakhri
-License: MIT
+The interface requires all seven factors, supports accessible keyboard input and responsive layout, and handles CSV files up to 5 MB and 20,000 records. CSV downloads escape potential spreadsheet formulas. Uses modern browser ES modules; no browser Python runtime is needed.
 
----
+## Python CLI
 
-## Installation
+Python 3.10 or later. Install and run:
 
-```bash
-# Clone the repository
-git clone https://github.com/abusuraihsakhri/timi-nstemi-risk-score.git
-cd timi-nstemi-risk-score
+~~~bash
+python -m pip install -e ".[dev]"
+timi-nstemi single --age 65 --cad-risk-factors 3 --known-cad yes \
+  --aspirin-last-7-days no --anginal-events-24h 2 \
+  --st-deviation no --elevated-biomarkers yes
+timi-nstemi batch -i sample.csv -o results.csv
+~~~
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+The required CSV fields are:
 
-# Install dependencies
-pip install -e ".[dev]"
-```
+~~~text
+age,cad_risk_factors,known_cad,aspirin_last_7_days,anginal_events_24h,st_deviation,elevated_biomarkers
+~~~
 
----
+Extra columns are retained. Booleans accept yes/no, true/false, or 1/0. Missing/invalid fields fail closed; invalid batches do not replace existing output. The former v1/v2/v3 CLI and CSV input schema is incompatible because it implemented unrelated arithmetic.
 
-## Quick Start
+## Optional API and legacy components
 
-### Single Case Evaluation
-```bash
-python timi_nstemi.py single --v1 14.5 --v2 4.2 --v3 1.8
-```
+Start the backend using:
 
-### Batch CSV Processing
-```bash
-python timi_nstemi.py batch -i sample.csv -o results.csv
-```
-
-### Enterprise CLI
-```bash
-# Audit single task
-python cli.py audit --task-id TASK-001 --primary 28.5 --secondary 14.2
-
-# Batch processing
-python cli.py batch -i sample.csv -o results.csv
-
-# Verify audit trail
-python cli.py verify-audit
-
-# Start API server
+~~~bash
 python cli.py serve --host 127.0.0.1 --port 8000
-```
+~~~
 
-### Docker Deployment
-```bash
-# Build and run
-docker build -t timi-nstemi-risk-score .
-docker run -p 8000:8000 -e AUDIT_SECRET_KEY=your-secret-key timi-nstemi-risk-score
+**POST /api/timi** accepts the seven required JSON fields (age, CAD count and anginal count as integers; the four other fields as JSON booleans) and returns the score, historical event rate, and criteria breakdown.
 
-# Or use docker-compose
-AUDIT_SECRET_KEY=your-secret-key docker-compose up
-```
+~~~json
+{
+  "age": 65,
+  "cad_risk_factors": 3,
+  "known_cad": true,
+  "aspirin_last_7_days": false,
+  "anginal_events_24h": 2,
+  "st_deviation": false,
+  "elevated_biomarkers": true
+}
+~~~
 
----
+The pre-existing generic agent console and legacy **/api/audit** and **/api/chat** routes are retained for compatibility. Their arbitrary metric thresholds and mock responses are **not TIMI scoring** and must not be used for clinical decisions. Never send PHI to these legacy routes. The generic backend is not suitable for public exposure without additional authentication and security controls.
 
-## API Endpoints
+The audit trail is signed in memory, not persistently stored. The log-read endpoint is disabled unless AUDIT_LOG_READ_TOKEN is set, then requires a Bearer token. When APP_ENV=production, AUDIT_SECRET_KEY must be configured. Do not place real keys in version control.
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Service health check |
-| `/metrics` | GET | Prometheus-compatible metrics |
-| `/api/audit` | POST | Submit task for evaluation |
-| `/api/chat` | POST | Query supervisory chat |
-| `/api/audit/logs` | GET | Retrieve audit trail |
+## Tests, deployment and environment
 
----
+~~~bash
+python -m pytest -q
+node --test tests/timi-web.test.mjs
+~~~
 
-## Testing
+GitHub Actions runs Python tests on 3.10–3.12 and JavaScript syntax/tests with Node 22. The Pages workflow deploys the static web directory from master when GitHub Pages is enabled. Browser targets: current Chrome, Firefox, Safari and Edge.
 
-```bash
-# Run all tests
-pytest -v
-
-# Run specific test files
-pytest tests/test_security_validation.py -v
-pytest tests/test_enrichment.py -v
-pytest tests/test_timi_nstemi_risk_score.py -v
-
-# Run with coverage
-pytest --cov=. --cov-report=html
-```
-
-### Simulation Benchmark
-```bash
-python simulator.py 1000
-```
-
----
-
-## Security Features
-
-- **Zero-PHI Outbound Interceptor:** AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers
-- **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation
-- **Path Traversal Protection:** Input/output file paths are validated to prevent directory traversal attacks
-- **Input Validation:** All calculation inputs are validated with clear error messages
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `AUDIT_SECRET_KEY` | Secret key for HMAC-SHA256 audit signing | Development fallback (warns) |
-| `MODEL_PROVIDER` | LLM provider (`mock`, `ollama`, `claude`, `openai`) | `mock` |
-
----
-
-## Project Structure
-
-```
-timi-nstemi-risk-score/
-├── agents/                  # Enterprise agent framework
-│   ├── api.py              # FastAPI REST server
-│   ├── base.py             # Security, PHI guard, audit trail
-│   ├── models.py           # Pydantic data models
-│   ├── supervisor.py       # Multi-agent orchestrator
-│   ├── workers.py          # Specialized worker agents
-│   ├── llm_factory.py      # LLM provider factory
-│   ├── learning.py         # Bayesian calibration engine
-│   ├── metrics.py          # Prometheus metrics collector
-│   └── streamer.py         # WebSocket telemetry broadcaster
-├── tests/                  # Test suite
-│   ├── test_security_validation.py
-│   ├── test_enrichment.py
-│   └── test_timi_nstemi_risk_score.py
-├── web/                    # Operations console (HTML)
-├── timi_nstemi.py          # Core calculation engine
-├── cli.py                  # Enterprise CLI
-├── enrichment.py           # Enrichment feature engines
-├── simulator.py            # High-throughput stress tester
-├── pyproject.toml          # Project configuration
-├── Dockerfile              # Container build
-├── docker-compose.yml      # Container orchestration
-└── sample.csv              # Sample input data
-```
-
----
-
-## Input Data Schema
-
-| Field | Description | Requirement |
-|:------|:------------|:------------|
-| `Patient_ID` | Patient identifier | Required |
-| `v1` | Primary parameter / measurement | Required |
-| `v2` | Secondary parameter | Required |
-| `v3` | Tertiary parameter | Required |
-
----
-
-## Mathematical Formulation
-
-The TIMI risk score is computed as:
-
-```
-score = v1 + v2/2 + v3/3 + ...
-```
-
-Classification tiers:
-- **Low / Standard:** score < 10.0
-- **Moderate / Intermediate:** 10.0 <= score < 25.0
-- **High / Severe:** score >= 25.0
-
----
+For the Docker service, copy .env.example to .env, provide a securely generated AUDIT_SECRET_KEY, then run docker compose up --build. By default the container binds to localhost, with an unprivileged user. Use separate operational and regulatory safeguards before using the API with clinical records.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+[MIT](LICENSE).

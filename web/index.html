@@ -1,236 +1,103 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Timi Nstemi Risk Score — Operations Console</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #090d16;
-            --card: #111827;
-            --border: #1f293d;
-            --accent: #3b82f6;
-            --accent-glow: rgba(59, 130, 246, 0.25);
-            --text: #f3f4f6;
-            --text-muted: #9ca3af;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --success: #10b981;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            padding: 2rem;
-            min-height: 100vh;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 1.5rem;
-            margin-bottom: 2rem;
-        }
-        .header-title h1 { font-size: 1.6rem; font-weight: 700; color: #fff; }
-        .header-title p { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem; }
-        .badge {
-            display: inline-block;
-            padding: 0.3rem 0.8rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            background: var(--accent-glow);
-            color: var(--accent);
-            border: 1px solid var(--accent);
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1.2fr;
-            gap: 1.5rem;
-        }
-        .card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-        }
-        .card h2 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .form-group { margin-bottom: 1rem; }
-        label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; }
-        input, select, textarea {
-            width: 100%;
-            padding: 0.65rem 0.9rem;
-            background: #0d1322;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: #fff;
-            font-family: inherit;
-            font-size: 0.9rem;
-        }
-        input:focus, textarea:focus { outline: none; border-color: var(--accent); }
-        .btn {
-            background: var(--accent);
-            color: #fff;
-            border: none;
-            padding: 0.7rem 1.4rem;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.2s;
-            width: 100%;
-        }
-        .btn:hover { background: #2563eb; }
-        .terminal {
-            background: #060911;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            color: #10b981;
-            height: 380px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-        }
-        .metrics-bar {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        .metric-box {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            text-align: center;
-        }
-        .metric-val { font-size: 1.4rem; font-weight: 700; color: #fff; margin-top: 0.25rem; }
-        .metric-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>TIMI UA/NSTEMI Risk Score</title>
+  <style>
+    :root { color-scheme: light; --ink:#18263a; --muted:#52647b; --line:#d9e2ec; --bg:#f4f7fb; --card:#fff; --accent:#1956ac; --focus:#1f6de5; }
+    * { box-sizing:border-box; }
+    body { margin:0; font:16px/1.52 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink); background:var(--bg); }
+    main { max-width:1080px; margin:0 auto; padding:24px 18px 50px; }
+    header { margin-bottom:22px; }
+    .eyebrow { margin:0 0 6px; font-size:.78rem; letter-spacing:.11em; text-transform:uppercase; color:var(--accent); font-weight:750; }
+    h1 { font-size:clamp(1.8rem,4vw,2.5rem); line-height:1.15; margin:0 0 12px; }
+    p { margin:8px 0 16px; }
+    .intro { max-width:780px; color:var(--muted); }
+    .layout { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(310px,.9fr); gap:18px; align-items:start; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:24px; box-shadow:0 6px 24px #162f4d08; }
+    h2 { font-size:1.14rem; margin:0 0 16px; }
+    h3 { font-size:1rem; margin:22px 0 8px; }
+    .field { margin:0 0 14px; }
+    label { display:block; font-weight:600; margin:0 0 5px; }
+    .hint { font-size:.83rem; color:var(--muted); margin:4px 0 6px; }
+    input, select { font:inherit; display:block; width:100%; max-width:100%; padding:10px 12px; border:1px solid #aabbd0; border-radius:8px; background:#fff; color:var(--ink); }
+    input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+    .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    button { cursor:pointer; border:0; border-radius:8px; padding:11px 17px; font:inherit; font-weight:700; background:var(--accent); color:#fff; }
+    button.secondary { background:#e7effa; color:#174b8d; }
+    .buttons { display:flex; gap:8px; flex-wrap:wrap; }
+    .buttons button { flex:1; }
+    .result { border-top:1px solid var(--line); padding-top:20px; margin-top:18px; }
+    .numbers { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .stat { background:#edf4ff; border:1px solid #d2e2f8; border-radius:10px; padding:18px 12px; }
+    .stat small { display:block; color:var(--muted); font-size:.78rem; }
+    .stat strong { font-size:2rem; display:block; line-height:1.2; margin:5px 0; font-variant-numeric:tabular-nums; }
+    .disclaimer { color:#596579; font-size:.86rem; }
+    .message { margin:14px 0; padding:10px 12px; border-left:3px solid #aa452d; background:#fff4ee; color:#742c1b; border-radius:4px; }
+    .pass { color:#21613f; }
+    .divider { margin:25px 0 19px; border:0; border-top:1px solid var(--line); }
+    a { color:var(--accent); text-underline-offset:2px; }
+    .download { display:inline-block; margin-top:10px; padding:10px 12px; border-radius:8px; border:1px solid var(--accent); }
+    [hidden] { display:none !important; }
+    footer { margin-top:25px; color:var(--muted); font-size:.84rem; }
+    @media (max-width:760px) { .layout { grid-template-columns:1fr; } .card { padding:18px; } }
+    @media (max-width:440px) { .two { grid-template-columns:1fr; } }
+  </style>
+  <script type="module" src="./app.mjs"></script>
 </head>
 <body>
-
-    <div class="header">
-        <div class="header-title">
-            <h1>Timi Nstemi Risk Score</h1>
-            <p>Domain: Clinical & Cryptographic AI | Standard: CAP / CLSI / NIST Standards | LabMind-Atlas Architecture</p>
+<main>
+  <header>
+    <p class="eyebrow">Clinical scoring reference · Local computation</p>
+    <h1>TIMI Risk Score — UA/NSTEMI</h1>
+    <p class="intro">The original 7-point TIMI score for suspected unstable angina or non-ST-elevation myocardial infarction. All seven criteria must be assessed. Results display historical 14-day composite event rates, not individual predictions.</p>
+  </header>
+  <div class="layout">
+    <section class="card" aria-labelledby="form-heading">
+      <h2 id="form-heading">Clinical criteria</h2>
+      <form id="calculator">
+        <div class="two">
+          <div class="field"><label for="age">Age (years)</label><input id="age" name="age" type="number" min="0" max="120" step="1" required placeholder="e.g. 65"></div>
+          <div class="field"><label for="cad_risk_factors">CAD risk factor count (0–5)</label><input id="cad_risk_factors" name="cad_risk_factors" type="number" min="0" max="5" step="1" required placeholder="e.g. 3"></div>
         </div>
-        <div>
-            <span class="badge">Air-Gapped Active</span>
-            <span class="badge" style="background: rgba(16,185,129,0.2); color: #10b981; border-color: #10b981;">Zero-PHI Guard Active</span>
+        <p class="hint">Count family history of CAD, hypertension, hypercholesterolemia, diabetes, and current smoking.</p>
+        <div class="two">
+          <div class="field"><label for="known_cad">Known coronary stenosis ≥50%</label><select id="known_cad" name="known_cad" required><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></div>
+          <div class="field"><label for="aspirin_last_7_days">Aspirin use in previous 7 days</label><select id="aspirin_last_7_days" name="aspirin_last_7_days" required><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></div>
         </div>
-    </div>
-
-    <div class="metrics-bar">
-        <div class="metric-box">
-            <div class="metric-label">System Status</div>
-            <div class="metric-val" style="color: var(--success);" id="m-status">OPTIMAL</div>
+        <div class="two">
+          <div class="field"><label for="anginal_events_24h">Anginal episodes in prior 24 h</label><input id="anginal_events_24h" name="anginal_events_24h" type="number" min="0" max="1000" step="1" required placeholder="e.g. 2"></div>
+          <div class="field"><label for="st_deviation">ST-segment deviation ≥0.5 mm</label><select id="st_deviation" name="st_deviation" required><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></div>
         </div>
-        <div class="metric-box">
-            <div class="metric-label">Tasks Processed</div>
-            <div class="metric-val" id="m-tasks">142</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-label">Audit Blocks Signed</div>
-            <div class="metric-val" id="m-audit">142</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-label">PHI Interceptions</div>
-            <div class="metric-val" style="color: var(--accent);" id="m-phi">0</div>
-        </div>
-    </div>
-
-    <div class="grid">
-        <div class="card">
-            <h2>⚙️ Dispatch Distributed Component Audit</h2>
-            <div class="form-group">
-                <label>Task / Sample ID</label>
-                <input type="text" id="task_id" value="TASK-2026-LIVE-01">
-            </div>
-            <div class="form-group">
-                <label>Target Identifier</label>
-                <input type="text" id="target_id" value="SPECIMEN-ALPHA-77">
-            </div>
-            <div class="form-group">
-                <label>Primary Measurement / Value</label>
-                <input type="number" id="primary_metric" value="29.4" step="0.1">
-            </div>
-            <div class="form-group">
-                <label>Secondary Metric / Kinetic Index</label>
-                <input type="number" id="secondary_metric" value="14.8" step="0.1">
-            </div>
-            <div class="form-group">
-                <label>Status / Phenotype Descriptor</label>
-                <input type="text" id="status_descriptor" value="DISCORDANT_ANOMALY">
-            </div>
-            <div class="form-group">
-                <label><input type="checkbox" id="is_critical" checked> Trigger Emergency / Critical Flag</label>
-            </div>
-            <button class="btn" onclick="runAudit()">Execute Distributed Component Audit</button>
-        </div>
-
-        <div class="card">
-            <h2>📊 Real-Time Consensus Dossier & Audit Log</h2>
-            <div class="terminal" id="outputConsole">// Timi Nstemi Risk Score Operations Console Ready
-// Connection established with Air-Gapped Supervisor
-// Cryptographic HMAC-SHA256 audit ledger loaded.
-// Ready for live task payload dispatch...</div>
-        </div>
-    </div>
-
-    <script>
-        async function runAudit() {
-            const consoleEl = document.getElementById('outputConsole');
-            consoleEl.innerText = "// Dispatching task across specialized workers...
-// Invoking InvariantQCWorker, SafetyEscalationWorker, ProtocolWorker...";
-
-            const payload = {
-                task_id: document.getElementById('task_id').value,
-                target_identifier: document.getElementById('target_id').value,
-                primary_metric: parseFloat(document.getElementById('primary_metric').value),
-                secondary_metric: parseFloat(document.getElementById('secondary_metric').value),
-                status_descriptor: document.getElementById('status_descriptor').value,
-                is_critical_flag: document.getElementById('is_critical').checked
-            };
-
-            try {
-                const res = await fetch('/api/audit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                consoleEl.innerText = JSON.stringify(data, null, 2);
-                document.getElementById('m-tasks').innerText = parseInt(document.getElementById('m-tasks').innerText) + 1;
-                document.getElementById('m-audit').innerText = parseInt(document.getElementById('m-audit').innerText) + 1;
-            } catch (err) {
-                consoleEl.innerText = "// Offline / Simulation Output:\n" + JSON.stringify({
-                    dossier_id: "DOSSIER-SIM-" + Math.floor(Math.random()*10000),
-                    system: "timi-nstemi-risk-score",
-                    domain: "Clinical & Cryptographic AI",
-                    task_id: payload.task_id,
-                    overall_urgency: payload.is_critical_flag ? "CRITICAL_STAT_PANIC" : "ELEVATED_RISK",
-                    integrity_status: "DISCORDANT_ANOMALY",
-                    alerts: [
-                        { worker: "InvariantQCWorker", alert: "Primary metric exceeds upper reference bound" },
-                        { worker: "SafetyEscalationWorker", alert: "Critical emergency interlock flag active" }
-                    ],
-                    audit_hash: "HMAC_SHA256_e83f9a72b941d6c381f9"
-                }, null, 2);
-            }
-        }
-    </script>
+        <div class="field"><label for="elevated_biomarkers">Elevated cardiac biomarkers</label><select id="elevated_biomarkers" name="elevated_biomarkers" required><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></div>
+        <div class="buttons"><button type="submit">Calculate TIMI score</button><button type="reset" class="secondary">Clear</button></div>
+      </form>
+      <div id="form-error" class="message" role="alert" hidden></div>
+    </section>
+    <section class="card" aria-labelledby="result-heading">
+      <h2 id="result-heading">Score & interpretation</h2>
+      <div id="empty-result" class="disclaimer">Complete the seven criteria to view the score and source-cohort event rate.</div>
+      <div id="result" class="result" aria-live="polite" hidden>
+        <div class="numbers"><div class="stat"><small>TIMI score</small><strong id="score"></strong><small>Range: 0–7 points</small></div><div class="stat"><small>14-day composite event rate</small><strong id="rate"></strong><small>Original TIMI 11B cohort</small></div></div>
+        <p><strong id="risk-band"></strong> score band (descriptive only)</p>
+        <p class="disclaimer">Endpoint: all-cause death, new or recurrent myocardial infarction, or severe recurrent ischemia requiring urgent revascularization through 14 days. Rates combine scores 0–1 and 6–7 in the original cohort.</p>
+      </div>
+      <hr class="divider">
+      <h2>Batch CSV (on your device)</h2>
+      <p class="hint">Required columns: <code>age, cad_risk_factors, known_cad, aspirin_last_7_days, anginal_events_24h, st_deviation, elevated_biomarkers</code>. Boolean fields accept yes/no or 1/0. Extra columns are preserved; potential spreadsheet formulas are escaped.</p>
+      <div class="field"><label for="batch-file">Select a CSV file (up to 5 MB)</label><input type="file" id="batch-file" accept=".csv,text/csv"></div>
+      <button id="process-csv" type="button">Process CSV locally</button>
+      <div id="batch-message" role="status" aria-live="polite"></div>
+      <a id="download" class="download" download="timi_results.csv" hidden>Download processed CSV</a>
+      <hr class="divider">
+      <h2>Source & limitations</h2>
+      <p class="disclaimer">Antman EM et al. <em>JAMA.</em> 2000;284:835–842. <a href="https://doi.org/10.1001/jama.284.7.835" target="_blank" rel="noopener noreferrer">Original TIMI study</a>.</p>
+      <p class="disclaimer">For education and reference; not validated here as a clinical decision-support device. The observed cohort percentages are not calibrated patient-specific probabilities. This tool does not recommend treatment or replace clinical judgment.</p>
+    </section>
+  </div>
+  <footer>Privacy: scoring and file processing occur in this browser without API calls, analytics, uploads, or storage. Avoid importing identifiable patient information.</footer>
+</main>
 </body>
 </html>

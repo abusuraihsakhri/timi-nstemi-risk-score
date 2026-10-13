@@ -1,100 +1,86 @@
-"""
-Security and input validation tests for timi-nstemi-risk-score.
-"""
-import sys
+"""Regression tests for published TIMI UA/NSTEMI score and safe CSV exports."""
+import csv
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 import pytest
-from timi_nstemi import calculate_metrics, process_batch, _validate_safe_path
+from timi_nstemi import calculate_metrics, process_batch, _validate_safe_path, EVENT_RATES
+
+BASE = dict(age=40, cad_risk_factors=0, known_cad=False,
+            aspirin_last_7_days=False, anginal_events_24h=0,
+            st_deviation=False, elevated_biomarkers=False)
+ALL = dict(age=65, cad_risk_factors=3, known_cad=True,
+           aspirin_last_7_days=True, anginal_events_24h=2,
+           st_deviation=True, elevated_biomarkers=True)
+FACTORS = list(BASE)
 
 
-class TestCalculateMetricsValidation:
-    """Tests for input validation in calculate_metrics."""
-
-    def test_empty_kwargs_raises_error(self):
-        with pytest.raises(ValueError, match="At least one input parameter is required"):
-            calculate_metrics()
-
-    def test_none_values_filtered(self):
-        result = calculate_metrics(v1=None, v2=None, valid=5.0)
-        assert result["score"] == 5.0
-
-    def test_single_numeric_param(self):
-        result = calculate_metrics(v1=10.0)
-        assert result["score"] == 10.0
-        assert result["classification"] == "Moderate / Intermediate"
-
-    def test_multiple_numeric_params(self):
-        result = calculate_metrics(v1=10.0, v2=5.0, v3=2.0)
-        # score = 10 + 5/2 + 2/3 = 10 + 2.5 + 0.67 = 13.17
-        assert result["score"] == pytest.approx(13.17, abs=0.01)
-
-    def test_string_params_ignored_in_calculation(self):
-        result = calculate_metrics(v1=10.0, name="test")
-        assert result["score"] == 10.0
-
-    def test_classification_low(self):
-        result = calculate_metrics(v1=5.0)
-        assert result["classification"] == "Low / Standard"
-        assert "Standard" in result["clinical_recommendation"]
-
-    def test_classification_moderate(self):
-        result = calculate_metrics(v1=15.0)
-        assert result["classification"] == "Moderate / Intermediate"
-        assert "Close observation" in result["clinical_recommendation"]
-
-    def test_classification_high(self):
-        result = calculate_metrics(v1=30.0)
-        assert result["classification"] == "High / Severe"
-        assert "Urgent" in result["clinical_recommendation"]
+@pytest.mark.parametrize("n", range(8))
+def test_every_score_and_source_rate(n):
+    inputs = BASE.copy()
+    inputs.update({key: ALL[key] for key in FACTORS[:n]})
+    result = calculate_metrics(**inputs)
+    assert result["score"] == n
+    assert result["event_rate_14d_pct"] == EVENT_RATES[n]
+    assert sum(result["criteria_met"].values()) == n
 
 
-class TestPathValidation:
-    """Tests for path traversal prevention."""
-
-    def test_valid_path_within_cwd(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        test_file = tmp_path / "test.csv"
-        test_file.write_text("data\n1\n")
-        result = _validate_safe_path("test.csv", must_exist=True)
-        assert result == test_file.resolve()
-
-    def test_path_traversal_blocked(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        with pytest.raises(ValueError, match="Path traversal detected"):
-            _validate_safe_path("../etc/passwd")
-
-    def test_nonexistent_input_file_raises(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        with pytest.raises(FileNotFoundError):
-            _validate_safe_path("nonexistent.csv", must_exist=True)
-
-    def test_output_path_doesnt_need_to_exist(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        result = _validate_safe_path("output.csv", must_exist=False)
-        assert result == (tmp_path / "output.csv").resolve()
+def test_clinical_thresholds():
+    assert calculate_metrics(**{**BASE, "age": 64})["score"] == 0
+    assert calculate_metrics(**{**BASE, "age": 65})["score"] == 1
+    assert calculate_metrics(**{**BASE, "cad_risk_factors": 2})["score"] == 0
+    assert calculate_metrics(**{**BASE, "cad_risk_factors": 3})["score"] == 1
+    assert calculate_metrics(**{**BASE, "anginal_events_24h": 1})["score"] == 0
+    assert calculate_metrics(**{**BASE, "anginal_events_24h": 2})["score"] == 1
 
 
-class TestProcessBatchValidation:
-    """Tests for process_batch security."""
+@pytest.mark.parametrize("changes", [
+    {"age": float("nan")}, {"age": -1}, {"age": 150}, {"cad_risk_factors": 6},
+    {"anginal_events_24h": 1.5}, {"known_cad": "maybe"},
+    {"age": None}, {"elevated_biomarkers": ""}, {"unexpected": 8},
+])
+def test_invalid_or_unknown_inputs_rejected(changes):
+    with pytest.raises(ValueError):
+        calculate_metrics(**{**BASE, **changes})
 
-    def test_batch_with_valid_paths(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        input_csv = tmp_path / "input.csv"
-        input_csv.write_text("Patient_ID,v1,v2\nPT-001,10.0,5.0\n")
-        output_csv = tmp_path / "output.csv"
-        process_batch(str(input_csv), str(output_csv))
-        assert output_csv.exists()
 
-    def test_batch_path_traversal_input(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        with pytest.raises((ValueError, FileNotFoundError)):
-            process_batch("../etc/passwd", "output.csv")
+def test_missing_input_never_defaults_to_negative():
+    with pytest.raises(ValueError, match="Missing required"):
+        calculate_metrics(age=65)
 
-    def test_batch_path_traversal_output(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        input_csv = tmp_path / "input.csv"
-        input_csv.write_text("Patient_ID,v1\nPT-001,10.0\n")
-        with pytest.raises(ValueError, match="Path traversal"):
-            process_batch(str(input_csv), "../etc/output.csv")
+
+def test_csv_batch_valid_and_formula_escaped(tmp_path):
+    src = tmp_path / "cases.csv"
+    out = tmp_path / "scores.csv"
+    with src.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=[*BASE, "note"])
+        writer.writeheader()
+        writer.writerow({**{key: str(value).lower() for key, value in ALL.items()}, "note": "=SUM(1,2)"})
+    process_batch(str(src), str(out))
+    with out.open(newline="") as f:
+        row = next(csv.DictReader(f))
+    assert row["score"] == "7"
+    assert row["event_rate_14d_pct"] == "40.9"
+    assert row["note"] == "'=SUM(1,2)"
+
+
+def test_invalid_row_does_not_replace_existing_output(tmp_path):
+    src = tmp_path / "cases.csv"
+    out = tmp_path / "scores.csv"
+    out.write_text("existing results", encoding="utf-8")
+    src.write_text(",".join(BASE) + "\n" + ",".join(["bad"] * len(BASE)) + "\n")
+    with pytest.raises(ValueError, match="row 2"):
+        process_batch(str(src), str(out))
+    assert out.read_text() == "existing results"
+    assert not list(tmp_path.glob(".timi-*.tmp"))
+
+
+def test_paths_and_output_collision(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    src = Path("cases.csv")
+    src.write_text("data\n")
+    assert _validate_safe_path("cases.csv", must_exist=True) == src.resolve()
+    with pytest.raises(ValueError, match="Path traversal"):
+        _validate_safe_path("foo/../bar")
+    with pytest.raises(FileNotFoundError):
+        _validate_safe_path("missing.csv", must_exist=True)
+    with pytest.raises(ValueError, match="different"):
+        process_batch("cases.csv", "cases.csv")

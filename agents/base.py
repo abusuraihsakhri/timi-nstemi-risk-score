@@ -8,6 +8,7 @@ import json
 import time
 import hmac
 import hashlib
+import copy
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
@@ -59,6 +60,8 @@ class AuditTrail:
     def __init__(self, secret_key: Optional[str] = None):
         resolved_key = secret_key or os.getenv("AUDIT_SECRET_KEY")
         if not resolved_key:
+            if os.getenv("APP_ENV", "").lower() == "production":
+                raise RuntimeError("AUDIT_SECRET_KEY is required when APP_ENV=production")
             import warnings
             warnings.warn(
                 "AUDIT_SECRET_KEY not set. Using a development-only fallback. "
@@ -71,6 +74,8 @@ class AuditTrail:
         self.logs: List[Dict[str, Any]] = []
 
     def log(self, actor: str, actor_tier: str, event_type: str, details: Dict[str, Any]) -> Dict[str, Any]:
+        for text in (actor, actor_tier, event_type):
+            assert_no_phi(str(text))
         payload_str = json.dumps(details, sort_keys=True)
         assert_no_phi(payload_str)
         payload_hash = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
@@ -93,14 +98,25 @@ class AuditTrail:
         return entry
 
     def verify_integrity(self) -> bool:
-        for i, entry in enumerate(self.logs):
-            prev = self.logs[i-1]["current_hash"] if i > 0 else "GENESIS_BLOCK_0000000000000000"
-            if entry["prev_hash"] != prev:
+        previous = "GENESIS_BLOCK_0000000000000000"
+        for entry in self.logs:
+            try:
+                if entry["prev_hash"] != previous:
+                    return False
+                message = "|".join(str(entry[field]) for field in (
+                    "audit_id", "timestamp", "actor", "actor_tier",
+                    "event_type", "payload_hash", "prev_hash",
+                ))
+                expected = hmac.new(self.secret_key, message.encode("utf-8"), hashlib.sha256).hexdigest()
+                if not hmac.compare_digest(str(entry["current_hash"]), expected):
+                    return False
+                previous = entry["current_hash"]
+            except (KeyError, TypeError):
                 return False
         return True
 
     def get_trail(self) -> List[Dict[str, Any]]:
-        return self.logs
+        return copy.deepcopy(self.logs)
 
 
 GLOBAL_AUDIT = AuditTrail()
