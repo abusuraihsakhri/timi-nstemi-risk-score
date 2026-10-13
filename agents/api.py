@@ -2,10 +2,12 @@
 FastAPI REST API Server for Timi Nstemi Risk Score.
 """
 import os
+import secrets
 from typing import Dict, Any, List
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Header
+from pydantic import BaseModel, Field, ConfigDict, StrictBool
 from .base import AuditLogger, PHIGuard
+from timi_nstemi import calculate_metrics
 from .models import SystemTaskPayload, ConsensusDossier
 from .supervisor import SystemSupervisor
 
@@ -27,6 +29,25 @@ app = FastAPI(
 
 class ChatRequest(BaseModel):
     query: str
+
+
+
+class TimiRequest(BaseModel):
+    """The seven required original TIMI UA/NSTEMI factors."""
+    model_config = ConfigDict(extra="forbid")
+    age: int = Field(ge=0, le=120)
+    cad_risk_factors: int = Field(ge=0, le=5)
+    known_cad: StrictBool
+    aspirin_last_7_days: StrictBool
+    anginal_events_24h: int = Field(ge=0, le=1000)
+    st_deviation: StrictBool
+    elevated_biomarkers: StrictBool
+
+
+@app.post("/api/timi")
+def score_timi(payload: TimiRequest):
+    """Published integer score and historical 14-day composite event rate."""
+    return calculate_metrics(**payload.model_dump())
 
 
 @app.get("/health")
@@ -60,5 +81,10 @@ def api_chat(req: ChatRequest):
 
 
 @app.get("/api/audit/logs")
-def api_audit_logs():
+def api_audit_logs(authorization: str | None = Header(default=None)):
+    secret = os.getenv("AUDIT_LOG_READ_TOKEN")
+    if not secret:
+        raise HTTPException(status_code=404, detail="Audit log endpoint disabled")
+    if not secrets.compare_digest(authorization or "", "Bearer " + secret):
+        raise HTTPException(status_code=401, detail="Unauthorized")
     return {"audit_trail": AuditLogger.get_trail(), "verified": AuditLogger.verify_integrity()}
