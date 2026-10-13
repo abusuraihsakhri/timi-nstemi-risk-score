@@ -1,146 +1,180 @@
 #!/usr/bin/env python3
-"""
-TIMI Risk Score for UA/NSTEMI
-Calculates 14-day all-cause mortality, MI, and severe recurrent ischemia risk in NSTEMI.
+"""TIMI risk score for unstable angina/non-ST-elevation myocardial infarction.
 
-Zero-dependency Python implementation with single and batch evaluation.
-Author: Dr. Abu Suraih Sakhri
-License: MIT
+The 7-item score and historical 14-day composite endpoint rates follow
+Antman et al., JAMA 2000;284:835-842 (doi:10.1001/jama.284.7.835).
 """
 
 import argparse
 import csv
 import json
-import math
 import os
-import sys
+import tempfile
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any
+
+FACTORS = (
+    "age", "cad_risk_factors", "known_cad", "aspirin_last_7_days",
+    "anginal_events_24h", "st_deviation", "elevated_biomarkers",
+)
+BINARY_FACTORS = ("known_cad", "aspirin_last_7_days", "st_deviation", "elevated_biomarkers")
+EVENT_RATES = (4.7, 4.7, 8.3, 13.2, 19.9, 26.2, 40.9, 40.9)
+REFERENCE = "Antman et al. JAMA. 2000;284:835-842. doi:10.1001/jama.284.7.835"
+OUTCOME = "14-day death, new/recurrent MI, or severe ischemia requiring urgent revascularization"
 
 
-def calculate_metrics(**kwargs) -> Dict[str, Any]:
-    """
-    Core domain algorithm for timi-nstemi-risk-score.
-    """
-    params = {}
-    for k, v in kwargs.items():
-        if v is not None:
-            try:
-                params[k] = float(v)
-            except (ValueError, TypeError):
-                params[k] = str(v)
-
-    if not params:
-        raise ValueError("At least one input parameter is required")
-
-    # Deterministic domain logic
-    numeric_vals = [val for val in params.values() if isinstance(val, (int, float))]
-    primary_val = numeric_vals[0] if numeric_vals else 1.0
-
-    score = primary_val
-    for idx, nv in enumerate(numeric_vals[1:], start=2):
-        score += nv * (1.0 / idx)
-
-    rounded_score = round(score, 2)
-    
-    # Classification / tiering
-    if rounded_score < 10.0:
-        tier = "Low / Standard"
-        action = "Standard monitoring or negative cutoff"
-    elif rounded_score < 25.0:
-        tier = "Moderate / Intermediate"
-        action = "Close observation or secondary evaluation"
+def _integer(value: Any, name: str, upper: int) -> int:
+    if isinstance(value, bool) or value is None:
+        raise ValueError(f"{name} must be an integer between 0 and {upper}")
+    if isinstance(value, int):
+        result = value
+    elif isinstance(value, str) and value.strip().isdecimal():
+        result = int(value.strip())
     else:
-        tier = "High / Severe"
-        action = "Urgent clinical intervention or primary positive finding"
+        raise ValueError(f"{name} must be an integer between 0 and {upper}")
+    if not 0 <= result <= upper:
+        raise ValueError(f"{name} must be an integer between 0 and {upper}")
+    return result
 
+
+def _boolean(value: Any, name: str = "factor") -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in (0, 1):
+        return bool(value)
+    if isinstance(value, str):
+        val = value.strip().lower()
+        if val in ("true", "yes", "1"):
+            return True
+        if val in ("false", "no", "0"):
+            return False
+    raise ValueError(f"{name} must be yes/no, true/false, or 1/0")
+
+
+def calculate_metrics(**kwargs: Any) -> dict[str, Any]:
+    """Calculate the original integer TIMI UA/NSTEMI score, not treatment advice.
+
+    CAD risk factor count covers family history, hypertension,
+    hypercholesterolemia, diabetes and current smoking (0-5).
+    Known CAD means prior stenosis >=50%; ST deviation means >=0.5 mm.
+    Historical event rates are cohort observations, not individual risks.
+    """
+    missing = [k for k in FACTORS if k not in kwargs or kwargs[k] is None or kwargs[k] == ""]
+    unknown = set(kwargs) - set(FACTORS)
+    if missing:
+        raise ValueError("Missing required TIMI inputs: " + ", ".join(missing))
+    if unknown:
+        raise ValueError("Unknown TIMI inputs: " + ", ".join(sorted(unknown)))
+
+    age = _integer(kwargs["age"], "age", 120)
+    cad_factors = _integer(kwargs["cad_risk_factors"], "cad_risk_factors", 5)
+    angina = _integer(kwargs["anginal_events_24h"], "anginal_events_24h", 1000)
+    flags = {name: _boolean(kwargs[name], name) for name in BINARY_FACTORS}
+    criteria = {
+        "age_65_or_older": age >= 65,
+        "three_or_more_cad_risk_factors": cad_factors >= 3,
+        "known_cad_stenosis_50_or_more": flags["known_cad"],
+        "aspirin_use_last_7_days": flags["aspirin_last_7_days"],
+        "two_or_more_anginal_events_24h": angina >= 2,
+        "st_deviation_0_5_mm_or_more": flags["st_deviation"],
+        "elevated_cardiac_biomarkers": flags["elevated_biomarkers"],
+    }
+    score = sum(criteria.values())
+    band = "Lower" if score <= 2 else "Intermediate" if score <= 4 else "Higher"
     return {
         "tool": "timi-nstemi-risk-score",
-        "score": rounded_score,
-        "classification": tier,
-        "clinical_recommendation": action,
-        "inputs_evaluated": len(params),
+        "score": score,
+        "max_score": 7,
+        "event_rate_14d_pct": EVENT_RATES[score],
+        "classification": band,
+        "criteria_met": criteria,
+        "outcome": OUTCOME,
+        "reference": REFERENCE,
+        "note": "Historical TIMI 11B cohort composite event rate; not an individualized probability or treatment directive.",
     }
 
 
-def process_single(args) -> None:
-    kwargs = vars(args)
-    kwargs.pop("func", None)
-    res = calculate_metrics(**kwargs)
-    print(json.dumps(res, indent=2))
-
-
 def _validate_safe_path(path_str: str, must_exist: bool = False) -> Path:
-    """Validate that a path is safe (no traversal) and return resolved Path.
-
-    Blocks path traversal via '..' components while allowing legitimate absolute
-    and relative paths including temp directories used by test frameworks.
-    """
-    if not path_str:
-        raise ValueError("Empty path provided")
-
-    # Reject paths that attempt traversal via .. components
-    normalized = os.path.normpath(path_str)
-    if ".." in Path(normalized).parts:
-        raise ValueError(f"Path traversal detected: '{path_str}' contains '..' components")
-
+    """Resolve an input/output path; reject explicit parent traversal components."""
+    if not path_str or ".." in Path(path_str).parts:
+        raise ValueError("Path traversal detected or empty path")
     path = Path(path_str).resolve()
-    if must_exist and not path.exists():
+    if must_exist and not path.is_file():
         raise FileNotFoundError(f"Input file not found: {path_str}")
     return path
 
 
+def _csv_safe(value: Any) -> Any:
+    """Prevent spreadsheet formula execution in user-supplied CSV columns."""
+    if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+        return "'" + value
+    return value
+
+
 def process_batch(input_csv: str, output_csv: str) -> None:
+    """Validate all records before atomically replacing the output CSV."""
     in_path = _validate_safe_path(input_csv, must_exist=True)
-    out_path = _validate_safe_path(output_csv, must_exist=False)
+    out_path = _validate_safe_path(output_csv)
+    if in_path == out_path:
+        raise ValueError("Input and output paths must be different")
+    temp_name = None
+    try:
+        with in_path.open("r", encoding="utf-8-sig", newline="") as infile:
+            reader = csv.DictReader(infile)
+            cols = reader.fieldnames or []
+            if len(cols) != len(set(cols)):
+                raise ValueError("CSV has duplicate column names")
+            missing = sorted(set(FACTORS) - set(cols))
+            if missing:
+                raise ValueError("CSV missing required headers: " + ", ".join(missing))
+            outputs = ("score", "event_rate_14d_pct", "classification")
+            if set(outputs) & set(cols):
+                raise ValueError("CSV already contains output column names")
+            with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="", dir=out_path.parent,
+                                             prefix=".timi-", suffix=".tmp", delete=False) as f:
+                temp_name = f.name
+                writer = csv.DictWriter(f, fieldnames=[*cols, *outputs])
+                writer.writeheader()
+                n = 0
+                for i, row in enumerate(reader, start=2):
+                    if None in row:
+                        raise ValueError(f"CSV row {i}: extra fields")
+                    try:
+                        res = calculate_metrics(**{k: row[k] for k in FACTORS})
+                    except ValueError as exc:
+                        raise ValueError(f"CSV row {i}: {exc}") from exc
+                    writer.writerow({**{k: _csv_safe(v) for k, v in row.items()},
+                                     "score": res["score"], "event_rate_14d_pct": res["event_rate_14d_pct"],
+                                     "classification": res["classification"]})
+                    n += 1
+        os.replace(temp_name, out_path)
+        temp_name = None
+        print(f"Processed {n} records -> {out_path}")
+    finally:
+        if temp_name is not None:
+            os.unlink(temp_name)
 
-    with open(in_path, mode="r", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        fieldnames = list(reader.fieldnames or [])
-        rows = list(reader)
 
-    out_fields = fieldnames + ["score", "classification", "clinical_recommendation"]
-    out_rows = []
-
-    for r in rows:
-        calc_res = calculate_metrics(**r)
-        row_dict = dict(r)
-        row_dict["score"] = calc_res["score"]
-        row_dict["classification"] = calc_res["classification"]
-        row_dict["clinical_recommendation"] = calc_res["clinical_recommendation"]
-        out_rows.append(row_dict)
-
-    with open(out_path, mode="w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=out_fields)
-        writer.writeheader()
-        writer.writerows(out_rows)
-
-    print(f"Processed {len(out_rows)} records -> {out_path}")
-
-
-def main(argv=None):
-    parser = argparse.ArgumentParser(description="TIMI Risk Score for UA/NSTEMI")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    # Single parser
-    single_parser = subparsers.add_parser("single", help="Evaluate single case")
-    single_parser.add_argument("--v1", type=float, default=10.0, help="Primary parameter")
-    single_parser.add_argument("--v2", type=float, default=5.0, help="Secondary parameter")
-    single_parser.add_argument("--v3", type=float, default=2.0, help="Tertiary parameter")
-    single_parser.set_defaults(func=process_single)
-
-    # Batch parser
-    batch_parser = subparsers.add_parser("batch", help="Process batch CSV")
-    batch_parser.add_argument("-i", "--input", required=True, help="Input CSV")
-    batch_parser.add_argument("-o", "--output", default="results.csv", help="Output CSV")
-
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="Validated TIMI UA/NSTEMI 0–7 risk score")
+    commands = parser.add_subparsers(dest="command", required=True)
+    single = commands.add_parser("single", help="Evaluate one patient without transmitting input")
+    for name in FACTORS:
+        single.add_argument("--" + name.replace("_", "-"), required=True,
+                            help="Explicit assessment (boolean items: yes/no)")
+    batch = commands.add_parser("batch", help="Evaluate CSV rows locally")
+    batch.add_argument("-i", "--input", required=True)
+    batch.add_argument("-o", "--output", default="results.csv")
     args = parser.parse_args(argv)
-
-    if args.command == "single":
-        args.func(args)
-    elif args.command == "batch":
-        process_batch(args.input, args.output)
+    try:
+        if args.command == "single":
+            print(json.dumps(calculate_metrics(**{k: getattr(args, k) for k in FACTORS}), indent=2))
+        else:
+            process_batch(args.input, args.output)
+    except (ValueError, FileNotFoundError, PermissionError, csv.Error) as exc:
+        parser.error(str(exc))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
